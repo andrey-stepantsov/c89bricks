@@ -1,0 +1,7 @@
+#ifndef CBricksLib_CONFIG
+#define CBricksLib_CONFIG 1
+
+#define CBricksLib_VERSION_MAJOR @CBricksLib_VERSION_MAJOR@
+#define CBricksLib_VERSION_MINOR @CBricksLib_VERSION_MINOR@
+
+#endif
