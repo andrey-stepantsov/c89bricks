@@ -1,12 +1,35 @@
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <getopt.h>
+#include <string.h>
+#include <errno.h>
 
 #include "CBricksLibConfig.h"
 
 #include "cprimes.h"
 
-void printVersion(){
+int silent = 0;
+char *separator = " ";
+
+int is_in_from_terminal() { return isatty(fileno(stdin)); }
+int is_out_to_terminal() { return isatty(fileno(stdout)); }
+
+void print_terminating_newline() {
+  if (is_out_to_terminal() && !silent)
+    fputs("\n", stdout);
+}
+
+void print_out(int value) {
+  static int count = 0;
+  if (!silent) {
+    if (count)
+      fputs(separator, stdout);
+    fprintf(stdout, "%d", value);
+  }
+  count++;
+}
+
+void printVersion() {
   printf("cprime %d.%d\n", CBricksLib_VERSION_MAJOR, CBricksLib_VERSION_MINOR);
 }
 
@@ -16,9 +39,7 @@ char quick_help[] =
     "\nExits with zero status if the number is a prime number.\n"
     "use -h or --help for information about options\n";
 
-void printQuickHelp(){
-  printf("%s", quick_help);
-}
+void printQuickHelp() { printf("%s", quick_help); }
 
 char help[] =
     "The cprime utility checks if a number (non-negative integer) is a prime.\n"
@@ -36,10 +57,54 @@ char help[] =
 
 void printHelp() { printf("%s", help); }
 
+int process_argv(int argc, char **argv, int optind) {
+  int non_primes = 0;
+  int errors = 0;
+  while (optind < argc) {
+    char *end_p = NULL;
+    long long int num = strtoll(argv[optind], &end_p, 10);
+    if (0 == *end_p) {
+      int test = is_prime(num);
+      if (!test)
+        ++non_primes;
+      print_out(test);
+    } else {
+      fprintf(stderr, "error at argument: %s, char(%d)\n", argv[optind],
+              (int)*end_p);
+      errors++;
+      break;
+    }
+    ++optind;
+  }
+  return non_primes + errors;
+}
+
+int process_stdin() {
+  int non_primes = 0;
+  int errors = 0;
+  long long int num;
+  int result = 0;
+  char str[70];
+  while (EOF != (result = fscanf(stdin, "%s", str))) {
+    char *end_p = NULL;
+    long long int num = strtoll(str, &end_p, 10);
+    if (0 == *end_p) {
+      int test = is_prime(num);
+      if (!test)
+        ++non_primes;
+      print_out(test);
+    } else {
+      fprintf(stderr, "error in scanf '%s'\n", str);
+      errors++;
+      break;
+    }
+  }
+  return non_primes + errors;
+}
+
 int main(int argc, char **argv) {
   int c;
   int digit_optind = 0;
-  int silent = 0;
 
   opterr = 0;
 
@@ -95,29 +160,24 @@ int main(int argc, char **argv) {
   }
 
   if (optind < argc) {
-    //printf("non-option ARGV-elements: ");
-    int non_primes = 0;
-    while (optind < argc) {
-      char* end_p = NULL;
-      long long int num = strtoll(argv[optind], &end_p, 10);
-      if(0 == *end_p) {
-        int test = is_prime(num);
-        if (!test)
-          ++non_primes;
-        if (!silent)
-          printf("%d ", test);
-      } else {
-        printf("error processing: %s, (%d)\n", argv[optind], (int)*end_p);
-        exit(EXIT_FAILURE);
-      }
-      ++optind;
+    int error = process_argv(argc, argv, optind);
+    print_terminating_newline();
+    if (0 == error) {
+      exit(EXIT_SUCCESS);
+    } else {
+      exit(EXIT_FAILURE);
     }
-    exit(non_primes ? EXIT_FAILURE : EXIT_SUCCESS);
-    //printf("\n");
   }
 
-  if (!isatty(fileno(stdin))) {
-    printf("processing stdin\n");
+  if (!is_in_from_terminal()) {
+    //printf("processing stdin\n");
+    int error = process_stdin();
+    print_terminating_newline();
+    if (0 == error) {
+      exit(EXIT_SUCCESS);
+    } else {
+      exit(EXIT_FAILURE);
+    }
   } else {
     printQuickHelp();
     exit(EXIT_FAILURE);
